@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ShieldAlert,
@@ -14,6 +14,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   Lock,
+  LocateFixed,
+  Radio,
 } from 'lucide-react';
 import { useSafetyStore } from '../store/safetyStore';
 import { SOSButton } from '../components/SOSButton';
@@ -30,17 +32,112 @@ export const DashboardPage: React.FC = () => {
     contacts,
     activeIncident,
     currentLocation,
+    updateLocation,
     refreshLocation,
     safeJourney,
     getResponseConfidenceEnvelope,
   } = useSafetyStore();
 
   const [refreshingGPS, setRefreshingGPS] = useState(false);
+  const [acquiringRealGPS, setAcquiringRealGPS] = useState(false);
+  const [isLiveStreaming, setIsLiveStreaming] = useState(false);
+  const [gpsNotice, setGpsNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const stopLiveStreamRef = useRef<(() => void) | null>(null);
+
+  // Auto-attempt real device GPS on initial mount if not already locked to GPS
+  useEffect(() => {
+    let isMounted = true;
+    if (typeof navigator !== 'undefined' && navigator.geolocation && currentLocation.source !== 'gps') {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          if (!isMounted) return;
+          const snapshot = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracyMeters: Math.round(position.coords.accuracy || 10),
+            capturedAt: new Date(position.timestamp || Date.now()).toISOString(),
+            source: 'gps' as const,
+            address: `${position.coords.latitude.toFixed(5)}, ${position.coords.longitude.toFixed(5)}`,
+          };
+          updateLocation(snapshot);
+          const addr = await LocationService.reverseGeocode(snapshot.latitude, snapshot.longitude);
+          if (isMounted) {
+            updateLocation({ ...snapshot, address: addr });
+          }
+        },
+        () => {
+          // Keep current fallback silently if permissions not yet granted
+        },
+        { enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 }
+      );
+    }
+    return () => {
+      isMounted = false;
+      if (stopLiveStreamRef.current) {
+        stopLiveStreamRef.current();
+      }
+    };
+  }, []);
 
   const handleRefreshGPS = async () => {
     setRefreshingGPS(true);
     await refreshLocation();
     setRefreshingGPS(false);
+  };
+
+  const handleAcquireRealGPS = async () => {
+    setAcquiringRealGPS(true);
+    setGpsNotice(null);
+    try {
+      const realLoc = await LocationService.requestRealDeviceGPS();
+      updateLocation(realLoc);
+      setGpsNotice({
+        type: 'success',
+        message: `✓ Real physical GPS acquired: ${realLoc.latitude.toFixed(5)}, ${realLoc.longitude.toFixed(5)} (±${realLoc.accuracyMeters}m). Map centered.`,
+      });
+      setTimeout(() => setGpsNotice(null), 6000);
+    } catch (err: any) {
+      setGpsNotice({
+        type: 'error',
+        message: err.message || 'Could not acquire real device GPS.',
+      });
+      setTimeout(() => setGpsNotice(null), 7000);
+    } finally {
+      setAcquiringRealGPS(false);
+    }
+  };
+
+  const toggleLiveStreaming = () => {
+    if (isLiveStreaming) {
+      if (stopLiveStreamRef.current) {
+        stopLiveStreamRef.current();
+        stopLiveStreamRef.current = null;
+      }
+      setIsLiveStreaming(false);
+      setGpsNotice({
+        type: 'success',
+        message: 'Live GPS stream paused.',
+      });
+      setTimeout(() => setGpsNotice(null), 3000);
+    } else {
+      setIsLiveStreaming(true);
+      const stopFn = LocationService.watchRealLocation(
+        (loc) => {
+          updateLocation(loc);
+        },
+        (err) => {
+          setIsLiveStreaming(false);
+          setGpsNotice({ type: 'error', message: err.message });
+        }
+      );
+      stopLiveStreamRef.current = stopFn;
+      setGpsNotice({
+        type: 'success',
+        message: '🟢 Live GPS Continuous Stream active: Coordinates update automatically as you move.',
+      });
+      setTimeout(() => setGpsNotice(null), 6000);
+    }
   };
 
   const handleSOSTriggered = (incidentId: string) => {
@@ -141,12 +238,50 @@ export const DashboardPage: React.FC = () => {
 
           {/* Location Snapshot Card with Map */}
           <div className="bg-white rounded-2xl border border-border-subtle p-5 shadow-soft space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-border-subtle/80">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-border-subtle/80 gap-2">
               <div className="flex items-center space-x-2">
                 <MapPin className="w-4 h-4 text-plum" />
                 <h3 className="text-sm font-bold text-plum">Current Location Snapshot</h3>
+                <span
+                  className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1 ${
+                    currentLocation.source === 'gps'
+                      ? 'bg-emerald-50 text-status-success border border-emerald-200'
+                      : 'bg-amber-50 text-status-warning border border-amber-200'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${currentLocation.source === 'gps' ? 'bg-status-success animate-ping' : 'bg-amber-400'}`}></span>
+                  <span>{currentLocation.source === 'gps' ? 'Live GPS Active' : 'Simulated Fallback'}</span>
+                </span>
               </div>
-              <div className="flex items-center space-x-2">
+
+              <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                {/* Continuous Live GPS Stream Toggle */}
+                <button
+                  type="button"
+                  onClick={toggleLiveStreaming}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-colors flex items-center space-x-1.5 shadow-xs border ${
+                    isLiveStreaming
+                      ? 'bg-emerald-600 text-white border-emerald-700 animate-pulse'
+                      : 'bg-white hover:bg-rose-blush/40 text-plum border-border-subtle'
+                  }`}
+                  title="Stream continuous real-time live location updates as you walk or travel"
+                >
+                  <Radio className={`w-3.5 h-3.5 ${isLiveStreaming ? 'text-white' : 'text-plum'}`} />
+                  <span>{isLiveStreaming ? 'Live Stream: ON' : 'Stream Live GPS'}</span>
+                </button>
+
+                {/* 1-Click Button to Acquire Real Physical Device Location */}
+                <button
+                  type="button"
+                  onClick={handleAcquireRealGPS}
+                  disabled={acquiringRealGPS}
+                  className="px-2.5 py-1 bg-plum text-ivory-warm rounded-xl text-xs font-semibold hover:bg-plum-800 transition-colors flex items-center space-x-1.5 shadow-xs disabled:opacity-50"
+                  title="Request real physical GPS latitude & longitude from device hardware"
+                >
+                  <LocateFixed className={`w-3.5 h-3.5 text-champagne ${acquiringRealGPS ? 'animate-spin' : ''}`} />
+                  <span>{acquiringRealGPS ? 'Locking GPS...' : 'Acquire GPS Fix'}</span>
+                </button>
+
                 <span
                   className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                     freshness.category === 'fresh'
@@ -158,6 +293,7 @@ export const DashboardPage: React.FC = () => {
                 >
                   {freshness.label}
                 </span>
+
                 <button
                   onClick={handleRefreshGPS}
                   disabled={refreshingGPS}
@@ -169,11 +305,29 @@ export const DashboardPage: React.FC = () => {
               </div>
             </div>
 
+            {/* GPS Notice Banner */}
+            {gpsNotice && (
+              <div
+                className={`p-2.5 rounded-xl text-xs font-semibold flex items-center space-x-2 animate-fadeIn ${
+                  gpsNotice.type === 'success'
+                    ? 'bg-emerald-50 text-status-success border border-emerald-200'
+                    : 'bg-amber-50 text-status-warning border border-amber-200'
+                }`}
+              >
+                {gpsNotice.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                )}
+                <span>{gpsNotice.message}</span>
+              </div>
+            )}
+
             <LiveMap
               location={currentLocation}
               isEmergency={Boolean(activeIncident)}
               onRefresh={handleRefreshGPS}
-              height="280px"
+              height="340px"
             />
           </div>
 
