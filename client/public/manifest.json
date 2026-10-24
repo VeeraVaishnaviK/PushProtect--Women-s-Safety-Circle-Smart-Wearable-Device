@@ -1,0 +1,18 @@
+{
+  "name": "Push Protect — Women's Safety Ecosystem",
+  "short_name": "Push Protect",
+  "description": "Your safety. Your signal. Your circle. Smart wearable-activated SOS response system.",
+  "start_url": "/app/dashboard",
+  "display": "standalone",
+  "background_color": "#FFFAF6",
+  "theme_color": "#45233F",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
