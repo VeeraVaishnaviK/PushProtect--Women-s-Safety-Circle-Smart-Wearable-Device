@@ -55,7 +55,7 @@ export interface Incident {
   userId: string;
   userName: string;
   userPhone: string;
-  source: 'wearable_button' | 'app_sos' | 'practice_drill' | 'safe_journey_timeout';
+  source: 'wearable_button' | 'app_sos' | 'practice_drill' | 'safe_journey_timeout' | 'heart_rate_abnormal';
   deviceId?: string;
   eventId: string;
   status: IncidentStatus;
@@ -98,6 +98,19 @@ export interface WearableDevice {
   lastSeenAt: string;
   hardwareModel: string;
   isSimulated?: boolean;
+  // Smartwatch biometric & activity telemetry
+  heartRateBpm?: number;
+  stepsToday?: number;
+  distanceKm?: number;
+  caloriesBurned?: number;
+  spO2Percent?: number;
+  activityState?: 'resting' | 'walking' | 'running';
+  panicAutoSosEnabled?: boolean;
+  panicHeartRateThreshold?: number;
+  // Micro-photovoltaic solar auto-charging telemetry (<50% battery trigger)
+  isSolarCharging?: boolean;
+  solarHarvestWatts?: number;
+  solarAutoChargeEnabled?: boolean;
 }
 
 export interface ResponseConfidenceEnvelopeData {

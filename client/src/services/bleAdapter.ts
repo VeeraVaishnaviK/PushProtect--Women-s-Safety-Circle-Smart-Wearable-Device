@@ -21,7 +21,7 @@ export class WearableBLEAdapter {
     // Default initial mock paired device
     this.currentDevice = {
       id: 'pp-device-esp32-v3',
-      name: 'Push Protect Ring / Charm v1',
+      name: 'Push Protect Wearable',
       deviceIdentifier: 'PP-ESP32-8F92',
       macAddress: 'DC:54:75:8F:92:B1',
       pairingStatus: 'connected',
@@ -30,6 +30,17 @@ export class WearableBLEAdapter {
       lastSeenAt: new Date().toISOString(),
       hardwareModel: 'ESP32-S3-WROOM-BLE5.0',
       isSimulated: true,
+      heartRateBpm: 76,
+      stepsToday: 4820,
+      distanceKm: 3.4,
+      caloriesBurned: 195,
+      spO2Percent: 98,
+      activityState: 'walking',
+      panicAutoSosEnabled: true,
+      panicHeartRateThreshold: 135,
+      isSolarCharging: false,
+      solarHarvestWatts: 0.45,
+      solarAutoChargeEnabled: true,
     };
   }
 
@@ -94,7 +105,7 @@ export class WearableBLEAdapter {
     }
   }
 
-  public simulatePairing(deviceName = 'Push Protect Charm S3'): Promise<WearableDevice> {
+  public simulatePairing(deviceName = 'Push Protect Wearable'): Promise<WearableDevice> {
     return new Promise((resolve) => {
       setTimeout(() => {
         const paired: WearableDevice = {
@@ -103,11 +114,22 @@ export class WearableBLEAdapter {
           deviceIdentifier: 'PP-ESP32-' + Math.floor(1000 + Math.random() * 9000),
           macAddress: 'DC:54:75:A1:4B:92',
           pairingStatus: 'connected',
-          batteryLevel: 88,
+          batteryLevel: 92,
           firmwareVersion: 'v1.4.2-sim',
           lastSeenAt: new Date().toISOString(),
           hardwareModel: 'ESP32-S3 Wearable Edition',
           isSimulated: true,
+          heartRateBpm: 76,
+          stepsToday: 4820,
+          distanceKm: 3.4,
+          caloriesBurned: 195,
+          spO2Percent: 98,
+          activityState: 'walking',
+          panicAutoSosEnabled: true,
+          panicHeartRateThreshold: 135,
+          isSolarCharging: false,
+          solarHarvestWatts: 0.45,
+          solarAutoChargeEnabled: true,
         };
         this.currentDevice = paired;
         this.notifyConnection(true);
