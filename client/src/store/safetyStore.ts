@@ -380,38 +380,46 @@ export const useSafetyStore = create<SafetyState>((set, get) => {
 
     startJourney: (destination, expectedArrivalMinutes, checkInIntervalMinutes) => {
       const now = new Date();
-      const expectedArrival = new Date(now.getTime() + expectedArrivalMinutes * 60000).toISOString();
-      const nextDue = new Date(now.getTime() + checkInIntervalMinutes * 60000).toISOString();
+      const arrivalMins = expectedArrivalMinutes || 30;
+      const intervalMins = checkInIntervalMinutes || 10;
+      const expectedArrival = new Date(now.getTime() + arrivalMins * 60000).toISOString();
+      const nextDue = new Date(now.getTime() + intervalMins * 60000).toISOString();
 
       set({
         safeJourney: {
           id: 'sj-' + Date.now(),
           origin: 'Current Location',
-          destination,
+          destination: destination || 'Destination',
           expectedArrivalTime: expectedArrival,
-          checkInIntervalMinutes,
+          checkInIntervalMinutes: intervalMins,
           status: 'active',
           startedAt: now.toISOString(),
           lastCheckInAt: now.toISOString(),
           nextCheckInDueAt: nextDue,
+          checkInCount: 0,
         },
       });
     },
 
     checkInJourney: () => {
       const current = get().safeJourney;
-      if (current.status === 'active' || current.status === 'missed_checkin') {
-        const now = new Date();
-        const nextDue = new Date(now.getTime() + current.checkInIntervalMinutes * 60000).toISOString();
-        set({
-          safeJourney: {
-            ...current,
-            status: 'active',
-            lastCheckInAt: now.toISOString(),
-            nextCheckInDueAt: nextDue,
-          },
-        });
-      }
+      const now = new Date();
+      const intervalMinutes =
+        current.checkInIntervalMinutes && current.checkInIntervalMinutes > 0
+          ? current.checkInIntervalMinutes
+          : 10;
+      const nextDue = new Date(now.getTime() + intervalMinutes * 60000).toISOString();
+
+      set({
+        safeJourney: {
+          ...current,
+          status: 'active',
+          checkInIntervalMinutes: intervalMinutes,
+          lastCheckInAt: now.toISOString(),
+          nextCheckInDueAt: nextDue,
+          checkInCount: (current.checkInCount || 0) + 1,
+        },
+      });
     },
 
     endJourney: () => {

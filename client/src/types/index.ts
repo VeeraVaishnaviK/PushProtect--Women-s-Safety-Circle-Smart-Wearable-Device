@@ -124,6 +124,7 @@ export interface SafeJourney {
   lastCheckInAt?: string;
   nextCheckInDueAt?: string;
   startedAt?: string;
+  checkInCount?: number;
 }
 
 export interface UserProfile {

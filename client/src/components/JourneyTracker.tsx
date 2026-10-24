@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Compass, Clock, CheckCircle2, AlertTriangle, ShieldCheck, Play, StopCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Compass, Clock, CheckCircle2, AlertTriangle, ShieldCheck, Play, StopCircle, Bell } from 'lucide-react';
 import { useSafetyStore } from '../store/safetyStore';
 
 export const JourneyTracker: React.FC = () => {
@@ -8,38 +8,82 @@ export const JourneyTracker: React.FC = () => {
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [checkInterval, setCheckInterval] = useState(10);
   const [secondsRemaining, setSecondsRemaining] = useState(0);
+  const [justCheckedIn, setJustCheckedIn] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   const isActive = safeJourney.status === 'active' || safeJourney.status === 'missed_checkin';
 
+  // Synchronize and count down
   useEffect(() => {
-    if (!isActive || !safeJourney.nextCheckInDueAt) return;
+    if (!isActive) return;
+
+    const calculateDiff = () => {
+      if (!safeJourney.nextCheckInDueAt) {
+        return (safeJourney.checkInIntervalMinutes || 10) * 60;
+      }
+      const dueTime = new Date(safeJourney.nextCheckInDueAt).getTime();
+      const now = Date.now();
+      return Math.max(0, Math.floor((dueTime - now) / 1000));
+    };
+
+    // Calculate immediately on mount or when due time updates
+    setSecondsRemaining(calculateDiff());
 
     const interval = setInterval(() => {
-      const diff = Math.max(0, Math.floor((new Date(safeJourney.nextCheckInDueAt!).getTime() - Date.now()) / 1000));
+      const diff = calculateDiff();
       setSecondsRemaining(diff);
-
-      // Auto escalate if check-in missed by 60s
-      if (diff === 0 && safeJourney.status === 'active') {
-        // missed checkin state
-      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isActive, safeJourney.nextCheckInDueAt, safeJourney.status]);
+  }, [isActive, safeJourney.nextCheckInDueAt, safeJourney.checkInIntervalMinutes]);
 
   const handleStart = (e: React.FormEvent) => {
     e.preventDefault();
     startJourney(destination, durationMinutes, checkInterval);
   };
 
+  const handleCheckIn = () => {
+    // 1. Haptic feedback
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate([60, 40, 100]);
+      } catch {}
+    }
+
+    // 2. Perform check-in in state store
+    checkInJourney();
+
+    // 3. Immediately reset countdown locally
+    const intervalSecs = (safeJourney.checkInIntervalMinutes || 10) * 60;
+    setSecondsRemaining(intervalSecs);
+
+    // 4. Visual confirmation
+    setJustCheckedIn(true);
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setFeedbackMessage(`✓ Check-in verified at ${nowStr}. Next check-in in ${safeJourney.checkInIntervalMinutes || 10} min.`);
+
+    setTimeout(() => {
+      setJustCheckedIn(false);
+    }, 2800);
+
+    setTimeout(() => {
+      setFeedbackMessage(null);
+    }, 5000);
+  };
+
   const formatCountdown = (secs: number) => {
+    if (isNaN(secs) || secs < 0) return '10:00';
     const m = Math.floor(secs / 60);
     const s = secs % 60;
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  const nextDueClockTime = safeJourney.nextCheckInDueAt
+    ? new Date(safeJourney.nextCheckInDueAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : `${safeJourney.checkInIntervalMinutes || 10}m`;
+
   return (
-    <div className="bg-white rounded-2xl border border-border-subtle p-5 shadow-soft">
+    <div className="bg-white rounded-2xl border border-border-subtle p-5 shadow-soft transition-all">
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-border-subtle/80 mb-4">
         <div className="flex items-center space-x-2.5">
@@ -68,30 +112,68 @@ export const JourneyTracker: React.FC = () => {
       {/* Active State View */}
       {isActive ? (
         <div className="space-y-4">
-          <div className="p-4 rounded-xl bg-ivory-warm border border-border-subtle/80">
-            <div className="flex items-center justify-between mb-2">
+          <div className="p-4 rounded-xl bg-ivory-warm border border-border-subtle/80 space-y-3">
+            <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-text-secondary">Target Destination</span>
               <span className="text-xs font-bold text-plum">{safeJourney.destination}</span>
             </div>
-            <div className="flex items-center justify-between mb-3 text-xs">
-              <span className="text-text-secondary">Next Check-In Due</span>
-              <span className="font-mono text-base font-bold text-berry">
-                {formatCountdown(secondsRemaining)}
+
+            <div className="flex items-center justify-between text-xs pt-1 border-t border-border-subtle/60">
+              <span className="text-text-secondary flex items-center space-x-1">
+                <Clock className="w-3.5 h-3.5 text-berry" />
+                <span>Next Check-In Due</span>
               </span>
+              <div className="text-right">
+                <span className="font-mono text-lg font-extrabold text-berry block leading-tight">
+                  {formatCountdown(secondsRemaining)}
+                </span>
+                <span className="text-[10px] text-text-secondary">
+                  Scheduled for {nextDueClockTime}
+                </span>
+              </div>
             </div>
+
+            {/* Instant Confirmation Toast / Feedback Banner */}
+            {feedbackMessage && (
+              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-status-success font-semibold flex items-center space-x-2 animate-in fade-in slide-in-from-top-2">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                <span>{feedbackMessage}</span>
+              </div>
+            )}
 
             {/* Check-In Action Button */}
             <button
-              onClick={checkInJourney}
-              className="w-full py-2.5 px-4 bg-status-success text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-2 hover:bg-emerald-700 transition-colors shadow-sm"
+              type="button"
+              onClick={handleCheckIn}
+              className={`w-full py-3 px-4 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-all transform active:scale-98 shadow-sm ${
+                justCheckedIn
+                  ? 'bg-emerald-700 ring-4 ring-emerald-200 scale-102'
+                  : 'bg-status-success hover:bg-emerald-700'
+              }`}
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>I'm Safe — Tap to Check-In</span>
+              <CheckCircle2 className={`w-4 h-4 ${justCheckedIn ? 'animate-bounce' : ''}`} />
+              <span>
+                {justCheckedIn
+                  ? '✓ SAFE CHECK-IN CONFIRMED!'
+                  : "I'm Safe — Tap to Check-In"}
+              </span>
             </button>
+
+            {/* Last Check-In info */}
+            {safeJourney.lastCheckInAt && (
+              <div className="text-[11px] text-text-secondary text-center pt-1">
+                Last checked in:{' '}
+                <span className="font-semibold text-plum">
+                  {new Date(safeJourney.lastCheckInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+                {safeJourney.checkInCount ? ` • ${safeJourney.checkInCount} check-in(s) completed` : ''}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between pt-1">
             <button
+              type="button"
               onClick={() => triggerSOS('safe_journey_timeout')}
               className="text-xs font-bold text-status-emergency hover:underline flex items-center space-x-1"
             >
@@ -100,6 +182,7 @@ export const JourneyTracker: React.FC = () => {
             </button>
 
             <button
+              type="button"
               onClick={endJourney}
               className="text-xs font-semibold text-text-secondary hover:text-plum flex items-center space-x-1 px-3 py-1.5 rounded-lg hover:bg-rose-blush/40 transition-colors"
             >
