@@ -1,12 +1,13 @@
 import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { IncidentDocument, IncidentStatus, DeliveryAttemptDto, AuditEventDto } from '../schemas/incident.schema';
+import { SMSService } from './sms.service';
 
 @Injectable()
 export class IncidentsService {
   private incidents: Map<string, IncidentDocument> = new Map();
   private processedEventIds: Set<string> = new Set();
 
-  constructor() {
+  constructor(private readonly smsService: SMSService) {
     // Seed initial mock incident for demonstration
     const seedId = 'INC-829104';
     const now = new Date(Date.now() - 3600000).toISOString();
@@ -21,12 +22,12 @@ export class IncidentsService {
       eventId: 'evt-seed-1',
       status: 'resolved',
       location: {
-        latitude: 28.6139,
-        longitude: 77.2090,
+        latitude: 13.0475,
+        longitude: 80.2824,
         accuracyMeters: 14,
         capturedAt: now,
         source: 'gps',
-        address: 'Near Connaught Place, New Delhi',
+        address: 'Near Marina Beach Road, Chennai, Tamil Nadu',
       },
       deliveryAttempts: [
         {
@@ -164,6 +165,32 @@ export class IncidentsService {
     };
 
     this.incidents.set(incidentId, incident);
+
+    // Asynchronously dispatch SMS alerts to contacts
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    for (const c of dto.contacts || []) {
+      const responseUrl = `${frontendUrl}/respond/incidents/${incidentId}`;
+      this.smsService
+        .sendEmergencyAlert({
+          to: c.phone,
+          userName: dto.userName,
+          incidentId,
+          responseUrl,
+          locationAddress: dto.location.address,
+        })
+        .then((res) => {
+          if (res.success) {
+            const attempt = incident.deliveryAttempts.find((d) => d.contactId === c.id);
+            if (attempt) {
+              attempt.deliveryStatus = 'delivered';
+              attempt.deliveredAt = new Date().toISOString();
+              attempt.providerReference = res.messageId;
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
     return incident;
   }
 
