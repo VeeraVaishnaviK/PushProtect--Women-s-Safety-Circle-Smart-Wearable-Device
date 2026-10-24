@@ -102,8 +102,8 @@ export const LandingPage: React.FC = () => {
                         PP
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-plum">Push Protect Ring S3</div>
-                        <div className="text-[10px] text-text-secondary">BLE 5.0 • 88% Battery</div>
+                        <div className="text-xs font-bold text-plum">Push Protect Wearable</div>
+                        <div className="text-[10px] text-text-secondary">BLE 5.0 • Heart Rate 76 BPM • 88% Battery</div>
                       </div>
                     </div>
                     <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-status-success border border-emerald-200">

@@ -2,7 +2,6 @@ import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Shield, Bluetooth, Users, Compass, ShieldCheck, Home } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
-import { Footer } from '../components/Footer';
 import { useSafetyStore } from '../store/safetyStore';
 
 export const AppLayout: React.FC = () => {
@@ -24,8 +23,6 @@ export const AppLayout: React.FC = () => {
       <main className="flex-1">
         <Outlet />
       </main>
-
-      <Footer />
 
       {/* Mobile Sticky Bottom Navigation Bar (Thumb-friendly PWA) */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-border-subtle px-2 py-1 flex items-center justify-around shadow-lg">
