@@ -11,6 +11,7 @@ import {
 } from '../types';
 import { bleAdapter } from '../services/bleAdapter';
 import { LocationService } from '../services/locationService';
+import { api } from '../services/api';
 
 interface SafetyState {
   user: UserProfile;
@@ -27,6 +28,8 @@ interface SafetyState {
   setUser: (user: Partial<UserProfile>) => void;
   setDevice: (device: WearableDevice | null) => void;
   updateDeviceBattery: (level: number) => void;
+  updateDeviceMetrics: (metrics: Partial<WearableDevice>) => void;
+  togglePanicAutoSos: () => void;
   updateLocation: (loc: LocationSnapshot) => void;
   refreshLocation: () => Promise<LocationSnapshot>;
   
@@ -35,7 +38,7 @@ interface SafetyState {
   updateContact: (id: string, updates: Partial<TrustedContact>) => void;
   removeContact: (id: string) => void;
   
-  triggerSOS: (source?: 'wearable_button' | 'app_sos' | 'practice_drill' | 'safe_journey_timeout') => Promise<Incident>;
+  triggerSOS: (source?: 'wearable_button' | 'app_sos' | 'practice_drill' | 'safe_journey_timeout' | 'heart_rate_abnormal') => Promise<Incident>;
   cancelIncident: (incidentId: string) => void;
   resolveIncident: (incidentId: string, notes?: string) => void;
   acknowledgeIncidentByContact: (incidentId: string, contactId: string) => void;
@@ -119,8 +122,22 @@ export const useSafetyStore = create<SafetyState>((set, get) => {
     },
     device: bleAdapter.getDevice(),
     contacts: INITIAL_CONTACTS,
-    activeIncident: null,
-    incidentHistory: [],
+    activeIncident: (() => {
+      try {
+        const saved = localStorage.getItem('pushprotect_active_incident');
+        return saved ? JSON.parse(saved) : null;
+      } catch {
+        return null;
+      }
+    })(),
+    incidentHistory: (() => {
+      try {
+        const saved = localStorage.getItem('pushprotect_incident_history');
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    })(),
     currentLocation: LocationService.getLastKnownLocation(),
     isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
     practiceModeActive: false,
@@ -142,6 +159,23 @@ export const useSafetyStore = create<SafetyState>((set, get) => {
       set((state) => ({
         device: state.device ? { ...state.device, batteryLevel: level } : null,
       })),
+
+    updateDeviceMetrics: (metrics) =>
+      set((state) => ({
+        device: state.device ? { ...state.device, ...metrics } : null,
+      })),
+
+    togglePanicAutoSos: () =>
+      set((state) => {
+        if (!state.device) return state;
+        const currentSetting = state.device.panicAutoSosEnabled ?? true;
+        return {
+          device: {
+            ...state.device,
+            panicAutoSosEnabled: !currentSetting,
+          },
+        };
+      }),
 
     updateLocation: (loc) => set({ currentLocation: loc }),
 
@@ -183,7 +217,9 @@ export const useSafetyStore = create<SafetyState>((set, get) => {
         contacts: state.contacts.filter((c) => c.id !== id),
       })),
 
-    triggerSOS: async (source: 'wearable_button' | 'app_sos' | 'practice_drill' | 'safe_journey_timeout' = 'app_sos') => {
+    triggerSOS: async (
+      source: 'wearable_button' | 'app_sos' | 'practice_drill' | 'safe_journey_timeout' | 'heart_rate_abnormal' = 'app_sos'
+    ) => {
       // 1. Immediately grab latest available cached or fresh location (NON-BLOCKING)
       const locSnapshot = await LocationService.getCurrentLocation();
       const now = new Date().toISOString();
@@ -222,8 +258,16 @@ export const useSafetyStore = create<SafetyState>((set, get) => {
             incidentId,
             timestamp: now,
             action: 'SOS_TRIGGERED',
-            actor: source === 'wearable_button' ? 'Smart Wearable Hardware' : 'Mobile Application',
-            description: `SOS activated via ${source.replace('_', ' ').toUpperCase()}`,
+            actor:
+              source === 'heart_rate_abnormal'
+                ? 'Smartwatch Panic Guard (PPG Biometrics)'
+                : source === 'wearable_button'
+                ? 'Push Protect Wearable Hardware'
+                : 'Mobile Application',
+            description:
+              source === 'heart_rate_abnormal'
+                ? 'Abnormal heart rate surge detected (>135 BPM). Panic Auto-SOS triggered.'
+                : `SOS activated via ${source.replace('_', ' ').toUpperCase()}`,
           },
           {
             id: 'tl-2',
@@ -244,9 +288,35 @@ export const useSafetyStore = create<SafetyState>((set, get) => {
         ],
       };
 
-      set({ activeIncident: newIncident });
+      // Immediately register active incident and add to history in Zustand store & localStorage
+      try {
+        localStorage.setItem('pushprotect_active_incident', JSON.stringify(newIncident));
+        const history = [newIncident, ...get().incidentHistory];
+        localStorage.setItem('pushprotect_incident_history', JSON.stringify(history));
+      } catch {}
 
-      // Simulate realistic carrier progression in non-practice mode
+      set((state) => ({
+        activeIncident: newIncident,
+        incidentHistory: [newIncident, ...state.incidentHistory],
+      }));
+
+      // Dispatch to NestJS backend API with graceful offline fallback
+      if (!isPractice) {
+        api.createIncident({
+          userId: get().user.id,
+          userName: get().user.displayName,
+          userPhone: get().user.phone,
+          source,
+          deviceId: get().device?.deviceIdentifier || 'IN-APP',
+          eventId: newIncident.eventId,
+          location: locSnapshot,
+          contacts: get().contacts,
+        }).catch((err) => {
+          console.warn('[PushProtect API] Backend fallback active:', err);
+        });
+      }
+
+      // Carrier progression simulation
       if (!isPractice) {
         setTimeout(() => {
           const current = get().activeIncident;
@@ -256,23 +326,27 @@ export const useSafetyStore = create<SafetyState>((set, get) => {
                 ? { ...att, deliveryStatus: 'delivered' as const, deliveredAt: new Date().toISOString() }
                 : att
             );
+            const updatedIncident: Incident = {
+              ...current,
+              status: 'dispatching',
+              deliveryAttempts: updatedAttempts,
+              timeline: [
+                ...current.timeline,
+                {
+                  id: 'tl-carrier-' + Date.now(),
+                  incidentId,
+                  timestamp: new Date().toISOString(),
+                  action: 'NOTIFICATION_DELIVERED',
+                  actor: 'Telecom Carrier Gateway',
+                  description: `SMS alert confirmed delivered to primary contact ${updatedAttempts[0].contactName}.`,
+                },
+              ],
+            };
+            try {
+              localStorage.setItem('pushprotect_active_incident', JSON.stringify(updatedIncident));
+            } catch {}
             set({
-              activeIncident: {
-                ...current,
-                status: 'dispatching',
-                deliveryAttempts: updatedAttempts,
-                timeline: [
-                  ...current.timeline,
-                  {
-                    id: 'tl-carrier-' + Date.now(),
-                    incidentId,
-                    timestamp: new Date().toISOString(),
-                    action: 'NOTIFICATION_DELIVERED',
-                    actor: 'Telecom Carrier Gateway',
-                    description: `SMS alert confirmed delivered to primary contact ${updatedAttempts[0].contactName}.`,
-                  },
-                ],
-              },
+              activeIncident: updatedIncident,
             });
           }
         }, 3000);
@@ -287,8 +361,9 @@ export const useSafetyStore = create<SafetyState>((set, get) => {
     },
 
     cancelIncident: (incidentId) => {
+      api.cancelIncident(incidentId).catch(() => {});
       const active = get().activeIncident;
-      if (active && active.id === incidentId) {
+      if (active && (active.id === incidentId || active.incidentId === incidentId)) {
         const cancelled: Incident = {
           ...active,
           status: 'cancelled',
@@ -306,16 +381,22 @@ export const useSafetyStore = create<SafetyState>((set, get) => {
             },
           ],
         };
+        try {
+          localStorage.removeItem('pushprotect_active_incident');
+          const history = [cancelled, ...get().incidentHistory.filter((i) => i.id !== incidentId && i.incidentId !== incidentId)];
+          localStorage.setItem('pushprotect_incident_history', JSON.stringify(history));
+        } catch {}
         set((state) => ({
           activeIncident: null,
-          incidentHistory: [cancelled, ...state.incidentHistory],
+          incidentHistory: [cancelled, ...state.incidentHistory.filter((i) => i.id !== incidentId && i.incidentId !== incidentId)],
         }));
       }
     },
 
     resolveIncident: (incidentId, notes) => {
+      api.resolveIncident(incidentId, notes).catch(() => {});
       const active = get().activeIncident;
-      if (active && active.id === incidentId) {
+      if (active && (active.id === incidentId || active.incidentId === incidentId)) {
         const resolved: Incident = {
           ...active,
           status: 'resolved',
@@ -334,14 +415,20 @@ export const useSafetyStore = create<SafetyState>((set, get) => {
             },
           ],
         };
+        try {
+          localStorage.removeItem('pushprotect_active_incident');
+          const history = [resolved, ...get().incidentHistory.filter((i) => i.id !== incidentId && i.incidentId !== incidentId)];
+          localStorage.setItem('pushprotect_incident_history', JSON.stringify(history));
+        } catch {}
         set((state) => ({
           activeIncident: null,
-          incidentHistory: [resolved, ...state.incidentHistory],
+          incidentHistory: [resolved, ...state.incidentHistory.filter((i) => i.id !== incidentId && i.incidentId !== incidentId)],
         }));
       }
     },
 
     acknowledgeIncidentByContact: (incidentId, contactId) => {
+      api.acknowledgeIncident(incidentId, contactId).catch(() => {});
       const active = get().activeIncident;
       if (active && active.id === incidentId) {
         const contact = get().contacts.find((c) => c.id === contactId);
@@ -399,10 +486,12 @@ export const useSafetyStore = create<SafetyState>((set, get) => {
           checkInCount: 0,
         },
       });
+      api.startJourney({ destination, expectedArrivalMinutes, checkInIntervalMinutes }).catch(() => {});
     },
 
     checkInJourney: () => {
       const current = get().safeJourney;
+      api.checkInJourney(current.id).catch(() => {});
       const now = new Date();
       const intervalMinutes =
         current.checkInIntervalMinutes && current.checkInIntervalMinutes > 0
