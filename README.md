@@ -1,8 +1,6 @@
 # 🛡️ PUSH PROTECT
 ### *"Your safety. Your signal. Your circle."*
 
-> **Accolade**: Awarded **2nd Place Overall** and a **4/5-Star Investor Evaluation** at the **AICTE / MIC IDE Bootcamp Phase 3** (11–15 May 2026).
-
 ---
 
 ## 📖 Executive Summary & Mission
@@ -64,8 +62,8 @@ Distinguishes between:
 ## 🗺️ Route Directory
 
 ### Public Website
-- `/` — Premium Landing Page (Hero showcase, 4-step workflow, Bootcamp award, and feature cards)
-- `/about` — Origins, AICTE/MIC milestone, and safety principles
+- `/` — Premium Landing Page (Hero showcase, 4-step workflow, and feature cards)
+- `/about` — Mission, origins, and core safety principles
 - `/how-it-works` — Deep dive into BLE 5.0, non-blocking GPS, and carrier escalation
 - `/privacy` — Privacy by Design pledge, data retention, and rights
 - `/contact` — Institutional partnerships and support channels

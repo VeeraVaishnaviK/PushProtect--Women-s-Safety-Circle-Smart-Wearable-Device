@@ -3,7 +3,6 @@
  * PUSH PROTECT — ESP32 SMART SOS WEARABLE FIRMWARE
  * ----------------------------------------------------------------------------
  * Hardware target: ESP32-S3 / ESP32-C3 / Standard ESP32 BLE 5.0
- * Award Recognition: AICTE/MIC IDE Bootcamp Phase 3 (2nd Place Overall)
  *
  * Description:
  *  - Low-power Bluetooth Low Energy (BLE) peripheral

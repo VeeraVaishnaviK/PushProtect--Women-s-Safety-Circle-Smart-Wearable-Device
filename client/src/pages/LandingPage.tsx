@@ -7,7 +7,6 @@ import {
   Compass,
   CheckCircle2,
   Lock,
-  Award,
   ArrowRight,
   Bluetooth,
   Navigation,
@@ -145,31 +144,6 @@ export const LandingPage: React.FC = () => {
                   Tactile button armed. Background response worker active.
                 </p>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Official Recognition & Award Banner */}
-      <section className="py-8 bg-plum text-ivory-warm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 rounded-xl bg-champagne/20 flex items-center justify-center flex-shrink-0 text-champagne">
-                <Award className="w-6 h-6" />
-              </div>
-              <div>
-                <span className="text-xs uppercase tracking-widest font-bold text-champagne">Validated Innovation</span>
-                <h3 className="text-base sm:text-lg font-bold text-white">
-                  2nd Place Overall &amp; 4/5-Star Investor Evaluation
-                </h3>
-                <p className="text-xs text-rose-blush/80">
-                  AICTE / MIC IDE Bootcamp Phase 3 • 11–15 May 2026
-                </p>
-              </div>
-            </div>
-            <div className="text-xs text-rose-blush/70 md:text-right max-w-md">
-              Honored for technical credibility, transparent emergency delivery pipelines, and privacy-first wearable architecture.
             </div>
           </div>
         </div>

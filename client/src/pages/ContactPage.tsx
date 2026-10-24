@@ -47,7 +47,7 @@ export const ContactPage: React.FC = () => {
                 <MapPin className="w-5 h-5 text-berry flex-shrink-0" />
                 <div>
                   <span className="font-bold text-plum block">Innovation Hub</span>
-                  <span>AICTE/MIC Innovation Complex, New Delhi, India</span>
+                  <span>Push Protect Innovation Labs, New Delhi, India</span>
                 </div>
               </div>
             </div>

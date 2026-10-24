@@ -1,31 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, Award, PhoneCall, Heart, ExternalLink } from 'lucide-react';
+import { Shield, PhoneCall, Heart, ExternalLink } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
     <footer className="bg-plum text-ivory-warm pt-16 pb-12 border-t border-plum-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Milestone / Recognition Banner */}
-        <div className="mb-12 p-6 rounded-2xl bg-berry/40 border border-champagne/30 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-xl bg-champagne/20 flex items-center justify-center flex-shrink-0 text-champagne">
-              <Award className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs uppercase tracking-widest font-bold text-champagne">Official Recognition</span>
-                <span className="text-xs bg-champagne/20 text-champagne px-2 py-0.5 rounded-full font-medium">11–15 May 2026</span>
-              </div>
-              <p className="text-sm font-semibold text-white mt-0.5">
-                2nd Place Overall &amp; 4/5-Star Investor Evaluation — AICTE/MIC IDE Bootcamp Phase 3
-              </p>
-            </div>
-          </div>
-          <div className="text-xs text-rose-blush/80 md:text-right max-w-sm">
-            Recognized for verifiable emergency response architecture, deterministic confidence metrics, and privacy-first wearable design.
-          </div>
-        </div>
 
         {/* 4 Columns */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
@@ -68,7 +48,7 @@ export const Footer: React.FC = () => {
               <li><Link to="/privacy" className="hover:text-white transition-colors">Location Ephemerality &amp; Retention</Link></li>
               <li><Link to="/about" className="hover:text-white transition-colors">No Exaggerated AI Claims</Link></li>
               <li><Link to="/privacy" className="hover:text-white transition-colors">Circle Consent &amp; Revocation</Link></li>
-              <li><Link to="/about" className="hover:text-white transition-colors">Bootcamp &amp; Research Origins</Link></li>
+              <li><Link to="/about" className="hover:text-white transition-colors">Mission &amp; Research Origins</Link></li>
             </ul>
           </div>
 

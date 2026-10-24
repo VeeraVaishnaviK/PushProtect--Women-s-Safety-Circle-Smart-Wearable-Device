@@ -1,5 +1,5 @@
 import React from 'react';
-import { Award, Shield, Users, Lock, Heart, CheckCircle2 } from 'lucide-react';
+import { Shield, Users, Lock, Heart, CheckCircle2 } from 'lucide-react';
 
 export const AboutPage: React.FC = () => {
   return (
@@ -16,25 +16,6 @@ export const AboutPage: React.FC = () => {
           </p>
         </div>
 
-        {/* AICTE / MIC IDE Bootcamp Milestone Card */}
-        <div className="p-8 rounded-3xl bg-plum text-ivory-warm border border-plum-800 shadow-elevated space-y-4">
-          <div className="flex items-center space-x-3 text-champagne">
-            <Award className="w-8 h-8" />
-            <span className="text-xs uppercase tracking-widest font-bold">Bootcamp Recognition</span>
-          </div>
-
-          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-white">
-            2nd Place Overall &amp; 4/5-Star Investor Evaluation
-          </h2>
-
-          <p className="text-xs sm:text-sm text-rose-blush/90 leading-relaxed">
-            Push Protect achieved second place overall with a stellar 4/5-star investor evaluation at the prestigious <strong className="text-white">AICTE/MIC IDE Bootcamp Phase 3</strong>, held from <strong className="text-white">11–15 May 2026</strong>.
-          </p>
-
-          <p className="text-xs text-rose-blush/80 leading-relaxed">
-            Evaluated by leading hardware engineers, venture investors, and cybersecurity mentors, our prototype was commended for its refusal to rely on fabricated AI claims, its implementation of the 5-dimension deterministic Response Confidence Envelope, and its rigorous BLE-to-carrier escalation mechanics.
-          </p>
-        </div>
 
         {/* Product Principles Grid */}
         <div className="space-y-6">
